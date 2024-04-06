@@ -34,9 +34,9 @@ function [A, B] = linearize(p, I_nu,n_nu, r_nu)
 
     % Display jacobian A, B
     disp("Jacobian of A");
-    disp(A);
+    %disp(A);
     disp("Jacobian of B");
-    disp(B);
+    %disp(B);
 
     for i = 1:1:4 
         A = subs(A, u(i), p(3)*p(1)/4);  % For now using mg/4
@@ -70,7 +70,7 @@ function [A, B] = linearize(p, I_nu,n_nu, r_nu)
 
     % Evaluate the matrices A and B
     A = double(A);
-    disp(A)
+    %disp(A)
     B = double(B);
-    disp(B)
+    %disp(B)
 end
