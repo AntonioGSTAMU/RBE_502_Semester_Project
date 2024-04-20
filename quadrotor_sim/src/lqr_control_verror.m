@@ -21,9 +21,9 @@ classdef lqr_control < handle
             %obj.target = obj.target';
             obj.k = lqr(A,B,Q,R);
             mult_fact2=10;
-            mult_fact3=30;
-            mult_fact4=60;
-            mult_fact5=0.1;
+            mult_fact3=50;
+            mult_fact4=100;
+            mult_fact5=200;
             Q2=Q;
             Q2(1,1)=mult_fact2*Q2(1,1);
             Q2(2,2)=mult_fact2*Q2(2,2);
@@ -44,16 +44,21 @@ classdef lqr_control < handle
             Q5(2,2)=mult_fact5*Q5(2,2);
             Q5(3,3)=mult_fact5*Q5(3,3);
             obj.k5= lqr(A,B,Q5,R);
-            %Q6=Q;
-            %Q6(1,1)=mult_fact6*Q6(1,1);
-            %Q6(2,2)=mult_fact6*Q6(2,2);
-            %Q6(3,3)=mult_fact6*Q6(3,3);
-            %obj.k5= lqr(A,B,Q5,R);
 
             obj.count=0;
             obj.y_hist_size=15;
             obj.y_history=zeros(3, obj.y_hist_size);
             obj.mindist=1000;
+        end
+
+        function del_y= first_order_pred(obj, y_0,y_1)
+            del_y=110*(y_1-y_0);
+        end
+        function del_y= second_order_pred(obj, y_0,y_1, y_2)
+            del_y_2=y_2-y_1;
+            del_y_1=y_1-y_0;
+            del_y_dash=del_y_2-del_y_1;
+            del_y=100*(del_y_2+del_y_dash);
         end
 
         function y_pred= curve_fit_2(obj, pointset, delta_t)
@@ -78,48 +83,6 @@ classdef lqr_control < handle
 
         end
 
-        function y=target_binder(obj,y_unbounded)
-            box_size=10;
-            y=y_unbounded;
-            x_max=box_size/2 -0.2;
-            y_max=box_size/2 -0.2;
-            z_max=box_size-0.2-0.2;
-            z_min=0+0.2;
-            x_min=-box_size/2 +0.2;
-            y_min=-box_size/2 +0.2;
-            if y_unbounded(1)>x_max
-                y(1)=x_max;
-            end
-            if y_unbounded(1)<x_min
-               y(1)=x_min;
-            end
-            if y_unbounded(2)>y_max
-               y(2)=y_max;
-            end
-            if y_unbounded(2)<y_min
-               y(2)=y_min;
-            end
-            if y_unbounded(3)>z_max
-               y(3)=z_max;
-            end
-            if y_unbounded(3)<z_min
-               y(3)=z_min;
-            end
-        end
-
-        function e=error_binder(obj,e_unbounded)
-            max_norm=2;     
-            curr_norm=norm(e_unbounded);
-            if curr_norm>max_norm
-                
-                e=(max_norm/curr_norm)*e_unbounded;
-            else
-                disp("Good error")
-                e=e_unbounded;
-            end
-        end
-
-
         function u = output(obj, isCaptured, z, y0) %z should be a 12x1 column vector
             obj.y_history(:,1)=[];
             obj.y_history=[obj.y_history,y0];
@@ -131,35 +94,26 @@ classdef lqr_control < handle
                     yt=y0;
                     obj.count=obj.count+1;
                 else
-                    uav_dist=norm(y0-z(1:3));
-                    if uav_dist>0.4 && uav_dist<3.5 %If we're close be more aggressive
+                    if norm(y0-z(1:3))<0.2 %If we're close be more aggressive
                         k_final=obj.k;
                         yt=obj.curve_fit_2(obj.y_history, delta_t);
-                    elseif uav_dist<=0.4 && uav_dist>0.2
-                        k_final=obj.k2;
-                        yt=obj.curve_fit_2(obj.y_history, delta_t/2);
-                    elseif uav_dist<=0.2 && uav_dist>0.1
-                        k_final=obj.k3;
-                        yt=obj.curve_fit_2(obj.y_history, delta_t/2);
-                    elseif uav_dist<=0.1
-                        k_final=obj.k4;
-                        yt=obj.curve_fit_2(obj.y_history, delta_t/2);
-                    elseif uav_dist>=3.5
-                        k_final=obj.k5;
+                        
+                    else
                         yt=obj.curve_fit_2(obj.y_history, delta_t);
                     end
                 end
             else %If captured, return to origin
                 yt=[0 0 0]';
-                k_final=obj.k5;
-
             end
-            yt=obj.target_binder(yt);
-            %error=obj.error_binder(z-[yt;zeros(9,1)]);
-            error=z-[yt;zeros(9,1)];
-            %disp(norm(error));
-            u = obj.u0 + (-k_final*(error));
 
+            if norm(y0-z(1:3))>0.3
+                u = obj.u0 + (-k_final*(z-[yt;zeros(9,1)]));
+            elseif isCaptured==false
+                v_error=1*(y0-z(1:3))/norm(y0-z(1:3));
+                u = obj.u0 + (-k_final*(z-[yt;zeros(3,1);v_error;zeros(3,1)]));
+            else
+                u = obj.u0 + (-k_final*(z-[yt;zeros(9,1)]));
+            end
         end
     end
 

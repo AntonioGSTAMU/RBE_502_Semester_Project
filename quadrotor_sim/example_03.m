@@ -21,7 +21,7 @@ dist = struct("r", @(t,z)0.1*[sin(t); sin(2*t); sin(4*t)],...
 intruder = uav(path, dist);
 
 % CONTROLLER
-ctrl = sample_hover_control(2, [3 0.2], quad);
+ctrl = sample_hover_control(8, [3 0.2], quad);
 
 % SIMULATION
 
