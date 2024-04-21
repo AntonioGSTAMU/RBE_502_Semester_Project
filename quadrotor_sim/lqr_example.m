@@ -66,6 +66,7 @@ sim.epsilon = 0.1;
 z0 = zeros(12,1);
 
 [t,z,u,d,y] = sim.simulate(z0);
+targets=ctrl.targets;
 
 % ANIMATION
 sim.animate(t, z, y);
