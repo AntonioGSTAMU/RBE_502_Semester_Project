@@ -20,10 +20,10 @@ classdef lqr_control < handle
             %obj.target = target_coords;
             %obj.target = obj.target';
             obj.k = lqr(A,B,Q,R);
-            mult_fact2=10;
+            mult_fact2=20;
             mult_fact3=30;
             mult_fact4=60;
-            mult_fact5=0.1;
+            mult_fact5=0.2;
             Q2=Q;
             Q2(1,1)=mult_fact2*Q2(1,1);
             Q2(2,2)=mult_fact2*Q2(2,2);
@@ -108,14 +108,11 @@ classdef lqr_control < handle
         end
 
         function e=error_binder(obj,e_unbounded)
-            max_norm=2;     
-            curr_norm=norm(e_unbounded);
+            max_norm=5;  
+            e=e_unbounded;
+            curr_norm=norm(e_unbounded(1:3));
             if curr_norm>max_norm
-                
-                e=(max_norm/curr_norm)*e_unbounded;
-            else
-                disp("Good error")
-                e=e_unbounded;
+                e(1:3)=(max_norm/curr_norm)*e_unbounded(1:3);
             end
         end
 
@@ -155,8 +152,8 @@ classdef lqr_control < handle
 
             end
             yt=obj.target_binder(yt);
-            %error=obj.error_binder(z-[yt;zeros(9,1)]);
-            error=z-[yt;zeros(9,1)];
+            error=obj.error_binder(z-[yt;zeros(9,1)]);
+            %error=z-[yt;zeros(9,1)];
             %disp(norm(error));
             u = obj.u0 + (-k_final*(error));
 
