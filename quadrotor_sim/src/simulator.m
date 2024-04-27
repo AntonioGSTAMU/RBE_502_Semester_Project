@@ -59,7 +59,7 @@ classdef simulator < handle
                 end
 
                 z0 = z(end,:)';
-
+                %disp(obj.epsilon)
                 if min(vecnorm(z_(:,1:3) - y_,2,2)) < obj.epsilon
                     iscaptured = true;
                 end

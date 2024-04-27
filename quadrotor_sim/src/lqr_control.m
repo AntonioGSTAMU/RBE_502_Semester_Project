@@ -4,12 +4,10 @@ classdef lqr_control < handle
         k(4,12) double;
         k2(4,12) double;
         k3(4,12) double;
-        k4(4,12) double;
-        k5(4,12) double;
-        k6(4,12) double;
-        u0(4,1) double;
         y_history double;
+        u0(4,1) double;
         targets;
+        uav_dist_list double
         y_hist_size(1,1) double;
         count(1,1) int64;
         sizecheck(1,1) int16
@@ -26,42 +24,37 @@ classdef lqr_control < handle
             obj.k = lqr(A,B,Q,R);
             obj.targets=[];
 
-            mult_fact2=20;
-            mult_fact3=30;
-            mult_fact4=50;
-            mult_fact5=0.2;
-            mult_fact6=2;
+            Q2 = diag([1700,1700, 250, 1000, 1000, 100, 100, 100, 100, 10000, 10000, 10000]);
+%             mult_fact3=30;
+%             mult_fact4=50;
+%             mult_fact5=2;
 
-            Q2=Q;
-            Q2(1,1)=mult_fact2*Q2(1,1);
-            Q2(2,2)=mult_fact2*Q2(2,2);
-            Q2(3,3)=mult_fact2*Q2(3,3);
             obj.k2= lqr(A,B,Q2,R);
-            Q3=Q;
-            Q3(1,1)=mult_fact3*Q3(1,1);
-            Q3(2,2)=mult_fact3*Q3(2,2);
-            Q3(3,3)=mult_fact3*Q3(3,3);
-            obj.k3= lqr(A,B,Q3,R);            
-            Q4=Q;
-            Q4(1,1)=mult_fact4*Q4(1,1);
-            Q4(2,2)=mult_fact4*Q4(2,2);
-            Q4(3,3)=mult_fact4*Q4(3,3);
-            obj.k4= lqr(A,B,Q4,R);            
-            Q5=Q;
-            Q5(1,1)=mult_fact5*Q5(1,1);
-            Q5(2,2)=mult_fact5*Q5(2,2);
-            Q5(3,3)=mult_fact5*Q5(3,3);
-            obj.k5= lqr(A,B,Q5,R);
-            Q6=Q;
-            Q6(1,1)=mult_fact6*Q6(1,1);
-            Q6(2,2)=mult_fact6*Q6(2,2);
-            Q6(3,3)=mult_fact6*Q6(3,3);
-            obj.k6= lqr(A,B,Q6,R);
+
+            Q3 = diag([2100,2100, 300, 1000, 1000, 100, 100, 100, 100, 10000, 10000, 10000]);
+            obj.k3= lqr(A,B,Q3,R);
+            
+%             Q3=Q;
+%             Q3(1,1)=mult_fact3*Q3(1,1);
+%             Q3(2,2)=mult_fact3*Q3(2,2);
+%             Q3(3,3)=mult_fact3*Q3(3,3);
+%             obj.k3= lqr(A,B,Q3,R);            
+%             Q4=Q;
+%             Q4(1,1)=mult_fact4*Q4(1,1);
+%             Q4(2,2)=mult_fact4*Q4(2,2);
+%             Q4(3,3)=mult_fact4*Q4(3,3);
+%             obj.k4= lqr(A,B,Q4,R);            
+%             Q5=Q;
+%             Q5(1,1)=mult_fact5*Q5(1,1);
+%             Q5(2,2)=mult_fact5*Q5(2,2);
+%             Q5(3,3)=mult_fact5*Q5(3,3);
+%             obj.k5= lqr(A,B,Q5,R);
 
             obj.count=0;
             obj.y_hist_size=15;
             obj.y_history=zeros(3, obj.y_hist_size);
             obj.mindist=1000;
+            obj.uav_dist_list=zeros(1,100);
         end
 
         function y_pred= curve_fit_2(obj, pointset, delta_t)
@@ -88,13 +81,14 @@ classdef lqr_control < handle
 
         function y=target_binder(obj,y_unbounded)
             box_size=10;
+            drone_size=1.5;
             y=y_unbounded;
-            x_max=box_size/2 -0.2;
-            y_max=box_size/2 -0.2;
-            z_max=box_size-0.2-0.2;
-            z_min=0+0.2;
-            x_min=-box_size/2 +0.2;
-            y_min=-box_size/2 +0.2;
+            x_max=box_size/2 -drone_size;
+            y_max=box_size/2 -drone_size;
+            z_max=box_size-drone_size;
+            z_min=0.2;
+            x_min=-box_size/2 +drone_size;
+            y_min=-box_size/2 +drone_size;
             if y_unbounded(1)>x_max
                 y(1)=x_max;
             end
@@ -126,7 +120,11 @@ classdef lqr_control < handle
 
 
         function u = output(obj, isCaptured, z, y0) %z should be a 12x1 column vector
+            uav_dist=norm(y0-z(1:3));
+            switch_control_thresh=0.2;
             if mod(obj.count,1)==0
+                obj.uav_dist_list(:,1)=[];
+                obj.uav_dist_list=[obj.uav_dist_list,uav_dist];
                 obj.sizecheck=obj.sizecheck+1;
                 obj.y_history(:,1)=[];
                 obj.y_history=[obj.y_history,y0];
@@ -140,30 +138,24 @@ classdef lqr_control < handle
                     yt=y0;
                 
                 else
-                    uav_dist=norm(y0-z(1:3));
-                    if uav_dist>1 && uav_dist<=3.5 %If we're close be more aggressive
+                    obj.uav_dist_list
+                    dist_diffs=diff(obj.uav_dist_list);
+                    av_dist=mean(obj.uav_dist_list);
+                    if all(dist_diffs<switch_control_thresh)
+                    if all(obj.uav_dist_list<=1.5) && uav_dist>0.65
                         k_final=obj.k;
                         yt=obj.curve_fit_2(obj.y_history, 1.1*delta_t);
-                    elseif uav_dist<=0.4 && uav_dist>0.2
-                        k_final=obj.k2;
-                        yt=obj.curve_fit_2(obj.y_history, delta_t/2);
-                    elseif uav_dist<=0.2 && uav_dist>0.1
-                        k_final=obj.k3;
-                        yt=obj.curve_fit_2(obj.y_history, delta_t/2);
-                    elseif uav_dist<=0.1
-                        k_final=obj.k4;
-                        yt=obj.curve_fit_2(obj.y_history, delta_t/2);
-                    elseif uav_dist>=3.5
-                        k_final=obj.k5;
+                    elseif all(obj.uav_dist_list<0.65)
+                        k_final=obj.k;
                         yt=obj.curve_fit_2(obj.y_history, delta_t);
-                    elseif uav_dist<=1 && uav_dist>0.4
-                        k_final=obj.k6;
-                        yt=obj.curve_fit_2(obj.y_history, delta_t);
+                    else %If we're close be more aggressive
+                        k_final=obj.k;
+                        yt=obj.curve_fit_2(obj.y_history, 1.1*delta_t);         
                     end
                 end
             else %If captured, return to origin
                 yt=[0 0 0]';
-                k_final=obj.k5;
+                k_final=obj.k;
 
             end
             obj.count=obj.count+1;
